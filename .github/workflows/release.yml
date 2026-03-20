@@ -1,0 +1,98 @@
+name: empycompress build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: empy-linux-x64
+          - os: macos-latest
+            artifact: empy-macos-arm64
+          - os: windows-latest
+            artifact: empy-windows-x64.exe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Linux system deps
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y gcc patchelf libfuse2
+      - name: Install Python deps
+        run: pip install cryptography "nuitka>=2.4" zstandard ordered-set
+      - name: Compile Linux and macOS
+        if: runner.os != 'Windows'
+        run: |
+          python -m nuitka --onefile --assume-yes-for-downloads --remove-output --output-filename=out empy.py
+          chmod +x out
+          mv out ${{ matrix.artifact }}
+      - name: Compile Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m nuitka --onefile --assume-yes-for-downloads --remove-output --output-filename=out.exe empy.py
+          Move-Item out.exe ${{ matrix.artifact }}
+      - name: Test Linux and macOS
+        if: runner.os != 'Windows'
+        run: |
+          ./${{ matrix.artifact }} --version
+          echo hello > /tmp/t.txt
+          ./${{ matrix.artifact }} encrypt /tmp/t.txt -p testpassword1 -f
+          ./${{ matrix.artifact }} decrypt /tmp/t.txt.empy -p testpassword1 --outdir /tmp/o -f
+          diff /tmp/t.txt /tmp/o/t.txt
+      - name: Test Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          .\${{ matrix.artifact }} --version
+          'hello' | Out-File t.txt -Encoding utf8
+          .\${{ matrix.artifact }} encrypt t.txt -p testpassword1 -f
+          .\${{ matrix.artifact }} decrypt t.txt.empy -p testpassword1 --outdir o -f
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/
+      - name: Flatten and checksum
+        run: |
+          find dist/ -type f -exec mv {} dist/ \;
+          find dist/ -mindepth 1 -type d -delete
+          cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: empycompress ${{ github.ref_name }}
+          body: |
+            Empyrean Secure Compression ${{ github.ref_name }}
+            Copyright Volvi 2026
+
+            Linux x64   - empy-linux-x64
+            macOS arm64 - empy-macos-arm64
+            Windows x64 - empy-windows-x64.exe
+
+            macOS and Linux: chmod +x the binary before running.
+          files: |
+            dist/empy-linux-x64
+            dist/empy-macos-arm64
+            dist/empy-windows-x64.exe
+            dist/SHA256SUMS.txt

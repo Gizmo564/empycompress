@@ -1,0 +1,9 @@
+dist/
+build/
+__pycache__/
+*.pyc
+*.empy
+*.empy.pub
+*.empy.key
+.DS_Store
+Thumbs.db
