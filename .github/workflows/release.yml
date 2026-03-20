@@ -94,8 +94,20 @@ jobs:
 
       - name: Flatten and checksum
         run: |
-          find dist/ -type f -exec mv {} dist/ \;
-          find dist/ -mindepth 1 -type d -delete
+          python3 - << 'PYEOF'
+          import os, shutil, tempfile
+          tmp = tempfile.mkdtemp(dir='dist')
+          for name in os.listdir('dist'):
+              sub = os.path.join('dist', name)
+              if os.path.isdir(sub) and sub != tmp:
+                  for f in os.listdir(sub):
+                      shutil.move(os.path.join(sub, f), os.path.join(tmp, f))
+                  os.rmdir(sub)
+          for f in os.listdir(tmp):
+              shutil.move(os.path.join(tmp, f), os.path.join('dist', f))
+          os.rmdir(tmp)
+          PYEOF
+          ls -lh dist/
           cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
 
       - uses: softprops/action-gh-release@v2
