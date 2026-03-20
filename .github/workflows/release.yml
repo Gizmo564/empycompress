@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -24,26 +27,37 @@ jobs:
             artifact: empy-windows-x64.exe
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Linux system deps
         if: runner.os == 'Linux'
         run: sudo apt-get update -qq && sudo apt-get install -y gcc patchelf libfuse2
+
+      - name: Windows C compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install mingw --no-progress -y
+
       - name: Install Python deps
         run: pip install cryptography "nuitka>=2.4" zstandard ordered-set
+
       - name: Compile Linux and macOS
         if: runner.os != 'Windows'
         run: |
           python -m nuitka --onefile --assume-yes-for-downloads --remove-output --output-filename=out empy.py
           chmod +x out
           mv out ${{ matrix.artifact }}
+
       - name: Compile Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          python -m nuitka --onefile --assume-yes-for-downloads --remove-output --output-filename=out.exe empy.py
+          python -m nuitka --onefile --mingw64 --assume-yes-for-downloads --remove-output --output-filename=out.exe empy.py
           Move-Item out.exe ${{ matrix.artifact }}
+
       - name: Test Linux and macOS
         if: runner.os != 'Windows'
         run: |
@@ -52,6 +66,7 @@ jobs:
           ./${{ matrix.artifact }} encrypt /tmp/t.txt -p testpassword1 -f
           ./${{ matrix.artifact }} decrypt /tmp/t.txt.empy -p testpassword1 --outdir /tmp/o -f
           diff /tmp/t.txt /tmp/o/t.txt
+
       - name: Test Windows
         if: runner.os == 'Windows'
         shell: pwsh
@@ -60,6 +75,7 @@ jobs:
           'hello' | Out-File t.txt -Encoding utf8
           .\${{ matrix.artifact }} encrypt t.txt -p testpassword1 -f
           .\${{ matrix.artifact }} decrypt t.txt.empy -p testpassword1 --outdir o -f
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
@@ -71,14 +87,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: dist/
+
       - name: Flatten and checksum
         run: |
           find dist/ -type f -exec mv {} dist/ \;
           find dist/ -mindepth 1 -type d -delete
           cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+
       - uses: softprops/action-gh-release@v2
         with:
           name: empycompress ${{ github.ref_name }}
