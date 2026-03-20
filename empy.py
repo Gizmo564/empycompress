@@ -46,8 +46,14 @@ if not getattr(sys, 'frozen', False):  # skip when compiled by Nuitka/PyInstalle
     _ensure_deps()
 # ─────────────────────────────────────────────────────────────────────────────
 
-import os, json, zlib, struct, hashlib, getpass, argparse, datetime, secrets
+import os, json, zlib, struct, hashlib, getpass, argparse, datetime, secrets, io
 from pathlib import Path
+
+# Force UTF-8 output on Windows (default is cp1252 which breaks Unicode art)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -1349,17 +1355,18 @@ def cmd_gui(args):
         print("\n  Server stopped.\n")
 
 
-BANNER = """
-  ███████╗███╗   ███╗██████╗ ██╗   ██╗
-  ██╔════╝████╗ ████║██╔══██╗╚██╗ ██╔╝
-  █████╗  ██╔████╔██║██████╔╝ ╚████╔╝
-  ██╔══╝  ██║╚██╔╝██║██╔═══╝   ╚██╔╝
-  ███████╗██║ ╚═╝ ██║██║        ██║
-  ╚══════╝╚═╝     ╚═╝╚═╝        ╚═╝
-  Empyrean Secure Compression  ·  v{ver}
-  AES-256-GCM · X25519-ECDH · PBKDF2 · HKDF · zlib
-  Copyright Volvi 2026
-""".format(ver=PROG_VERSION)
+BANNER = (
+    "\n"
+    "  #######  #    #  #####   #   #  \n"
+    "  #        ##  ##  #    #   # #   \n"
+    "  #####    # ## #  #####     #    \n"
+    "  #        #    #  #         #    \n"
+    "  #######  #    #  #         #    \n"
+    "\n"
+    "  Empyrean Secure Compression  v" + PROG_VERSION + "\n"
+    "  AES-256-GCM  X25519-ECDH  PBKDF2  HKDF  zlib\n"
+    "  Copyright Volvi 2026\n"
+)
 
 
 # ─────────────────────────────────────────────────────
