@@ -44,18 +44,60 @@ jobs:
       - name: Install Python deps
         run: pip install cryptography "nuitka>=2.4" zstandard ordered-set
 
+      - name: Build macOS icon
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p icon.iconset
+          sips -z 16 16   assets/icon.png --out icon.iconset/icon_16x16.png
+          sips -z 32 32   assets/icon.png --out icon.iconset/icon_16x16@2x.png
+          sips -z 32 32   assets/icon.png --out icon.iconset/icon_32x32.png
+          sips -z 64 64   assets/icon.png --out icon.iconset/icon_32x32@2x.png
+          sips -z 128 128 assets/icon.png --out icon.iconset/icon_128x128.png
+          sips -z 256 256 assets/icon.png --out icon.iconset/icon_128x128@2x.png
+          sips -z 256 256 assets/icon.png --out icon.iconset/icon_256x256.png
+          sips -z 512 512 assets/icon.png --out icon.iconset/icon_256x256@2x.png
+          sips -z 512 512 assets/icon.png --out icon.iconset/icon_512x512.png
+          iconutil -c icns icon.iconset -o assets/icon.icns
+
+      - name: Build Linux icon
+        if: runner.os == 'Linux'
+        run: |
+          pip install pillow -q
+          python3 -c "
+          from PIL import Image
+          img = Image.open('assets/icon.png').convert('RGBA')
+          img.save('assets/icon.png')
+          "
+
       - name: Compile Linux and macOS
         if: runner.os != 'Windows'
         run: |
-          python -m nuitka --onefile --assume-yes-for-downloads --remove-output --output-filename=out empy.py
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            python -m nuitka --onefile --assume-yes-for-downloads --remove-output --output-filename=out --macos-app-icon=assets/icon.icns empy.py
+          else
+            python -m nuitka --onefile --assume-yes-for-downloads --remove-output --output-filename=out --linux-icon=assets/icon.png empy.py
+          fi
           chmod +x out
           mv out ${{ matrix.artifact }}
+          chmod +x ${{ matrix.artifact }}
+
+      - name: Build Windows icon
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          pip install pillow -q
+          python3 -c "
+          from PIL import Image
+          img = Image.open('assets/icon.png').convert('RGBA')
+          sizes = [(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)]
+          img.save('assets/icon.ico', sizes=sizes)
+          "
 
       - name: Compile Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          python -m nuitka --onefile --mingw64 --assume-yes-for-downloads --remove-output --output-filename=out.exe empy.py
+          python -m nuitka --onefile --mingw64 --assume-yes-for-downloads --remove-output --output-filename=out.exe --windows-icon-from-ico=assets/icon.ico empy.py
           Move-Item out.exe ${{ matrix.artifact }}
 
       - name: Test Linux and macOS
