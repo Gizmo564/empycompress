@@ -2,24 +2,32 @@
 set -e
 cd "$(dirname "$0")"
 
-# Read current version from empy.py
-CURRENT=$(grep 'PROG_VERSION = ' empy.py | sed 's/PROG_VERSION = "//;s/"//')
+# Use Python to read and bump the version — more reliable than sed across platforms
+NEW_VERSION=$(python3 - <<'PYEOF'
+import re, sys
+text = open("empy.py").read()
+m = re.search(r'PROG_VERSION = "(\d+)\.(\d+)\.(\d+)"', text)
+if not m:
+    sys.exit("ERROR: could not find PROG_VERSION in empy.py")
+major, minor, patch = m.group(1), m.group(2), str(int(m.group(3)) + 1)
+new_ver = f"{major}.{minor}.{patch}"
+new_text = re.sub(r'PROG_VERSION = "\d+\.\d+\.\d+"', f'PROG_VERSION = "{new_ver}"', text)
+open("empy.py", "w").write(new_text)
+print(new_ver)
+PYEOF
+)
 
-# Split into major.minor.patch and increment patch
-MAJOR=$(echo "$CURRENT" | cut -d. -f1)
-MINOR=$(echo "$CURRENT" | cut -d. -f2)
-PATCH=$(echo "$CURRENT" | cut -d. -f3)
-NEW_PATCH=$((PATCH + 1))
-NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-
-echo "Bumping version: $CURRENT → $NEW_VERSION"
-
-# Write new version back into empy.py
-sed -i.bak "s/PROG_VERSION = \"$CURRENT\"/PROG_VERSION = \"$NEW_VERSION\"/" empy.py
-rm -f empy.py.bak
+echo "Version bumped to $NEW_VERSION"
 
 git add .
-git commit -m "empycompress v$NEW_VERSION"
+
+# Commit only if there is something staged
+if git diff --cached --quiet; then
+    echo "Nothing new to commit — tagging and pushing existing state."
+else
+    git commit -m "empycompress v$NEW_VERSION"
+fi
+
 git tag "v$NEW_VERSION"
 git push origin main
 git push origin "v$NEW_VERSION"

@@ -1,23 +1,31 @@
 Set-Location $PSScriptRoot
 
-# Read current version from empy.py
-$current = (Select-String 'PROG_VERSION = "(.+)"' empy.py).Matches[0].Groups[1].Value
+# Use Python to read and bump the version
+$newVersion = python3 -c @"
+import re, sys
+text = open('empy.py').read()
+m = re.search(r'PROG_VERSION = \"(\d+)\.(\d+)\.(\d+)\"', text)
+if not m:
+    sys.exit('ERROR: could not find PROG_VERSION in empy.py')
+major, minor, patch = m.group(1), m.group(2), str(int(m.group(3)) + 1)
+new_ver = f'{major}.{minor}.{patch}'
+new_text = re.sub(r'PROG_VERSION = \"\d+\.\d+\.\d+\"', f'PROG_VERSION = \"{new_ver}\"', text)
+open('empy.py', 'w').write(new_text)
+print(new_ver)
+"@
 
-# Split into major.minor.patch and increment patch
-$parts     = $current.Split('.')
-$major     = $parts[0]
-$minor     = $parts[1]
-$newPatch  = [int]$parts[2] + 1
-$newVersion = "$major.$minor.$newPatch"
-
-Write-Host "Bumping version: $current -> $newVersion"
-
-# Write new version back into empy.py
-(Get-Content empy.py) -replace "PROG_VERSION = `"$current`"", "PROG_VERSION = `"$newVersion`"" |
-    Set-Content empy.py
+Write-Host "Version bumped to $newVersion"
 
 git add .
-git commit -m "empycompress v$newVersion"
+
+# Commit only if there is something staged
+$staged = git diff --cached --quiet
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "Nothing new to commit — tagging and pushing existing state."
+} else {
+    git commit -m "empycompress v$newVersion"
+}
+
 git tag "v$newVersion"
 git push origin main
 git push origin "v$newVersion"
