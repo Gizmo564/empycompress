@@ -67,7 +67,7 @@ from cryptography.exceptions import InvalidTag
 MAGIC        = b"EMPY"
 VERSION_V1   = 1     # standard encrypted file
 VERSION_V2   = 2     # peer-sealed (double-encrypted) file
-PROG_VERSION = "3.4.0"
+PROG_VERSION = "3.5.0"
 
 SALT_LEN     = 32
 NONCE_LEN    = 12
@@ -145,7 +145,7 @@ def _fingerprint(pub_bytes: bytes) -> str:
 #   ENC_DATA   var  (AES-GCM encrypted + zlib-compressed file data)
 #
 
-def _v1_encode(raw: bytes, filename: str, password: str) -> bytes:
+def _v1_encode(raw: bytes, filename: str, password: str) -> tuple[bytes, dict]:
     """Encode raw file bytes into a V1 .empy blob."""
     salt  = os.urandom(SALT_LEN)
     nonce = os.urandom(NONCE_LEN)
@@ -268,8 +268,8 @@ def _v2_encode(inner_blob: bytes, recipient_pub_bytes: bytes,
             + struct.pack(">I", len(enc_inner))     + enc_inner)
 
 
-def _v2_decode(blob: bytes, my_priv_bytes: bytes, peer_password: str) -> tuple[bytes, dict, dict]:
-    """Unseal a V2 blob. Returns (inner_blob, peer_meta, {fp_match})."""
+def _v2_decode(blob: bytes, my_priv_bytes: bytes, peer_password: str) -> tuple[bytes, dict]:
+    """Unseal a V2 blob. Returns (inner_blob, peer_meta)."""
     buf = memoryview(blob)
     pos = 0
 
@@ -594,7 +594,7 @@ def cmd_info(args):
         print(f"  │           .empy File Information  (V2 Sealed)         │")
         print(f"  └───────────────────────────────────────────────────────┘")
         # Read the recipient fingerprint without decrypting
-        pos = 1 + 4 + SALT_LEN + NONCE_LEN + 32   # skip MAGIC+VER+salt+nonce+eph_pub
+        pos = 4 + 1 + SALT_LEN + NONCE_LEN + 32   # skip: MAGIC(4) VER(1) PEER_SALT(32) PEER_NONCE(12) EPH_PUB(32)
         recip_fp = blob[pos:pos+RECIP_FP_LEN].decode("ascii")
         print(f"  Package    : {inp.name}  ({_h(pkg)})")
         print(f"  Version    : {VERSION_V2}  (peer-sealed, double-encrypted)")
@@ -783,7 +783,7 @@ input[type=file]{display:none}
 <!-- TITLE BAR -->
 <div class="tb">
   <div class="logo">EMPY</div>
-  <div class="logo-sub">Empyrean Secure Compression &nbsp;·&nbsp; v3.0 &nbsp;·&nbsp; Copyright Volvi 2026</div>
+  <div class="logo-sub">Empyrean Secure Compression &nbsp;·&nbsp; v__VERSION__ &nbsp;·&nbsp; Copyright Volvi 2026</div>
   <div class="tb-right">&#x25CF; SECURE<span>_</span></div>
 </div>
 
@@ -1179,6 +1179,9 @@ async function doInfo() {
 </html>"""
 
 
+_GUI_HTML = _GUI_HTML.replace("__VERSION__", PROG_VERSION)
+
+
 # ─────────────────────────────────────────────────────
 #  GUI command — local HTTP server + browser
 # ─────────────────────────────────────────────────────
@@ -1331,7 +1334,7 @@ def cmd_gui(args):
                     _, meta = _v1_decode(blob, pwd)
                     return {"ok": True, "version": 1, "meta": meta}
                 if ver == VERSION_V2:
-                    pos = 1 + 4 + SALT_LEN + NONCE_LEN + 32
+                    pos = 4 + 1 + SALT_LEN + NONCE_LEN + 32
                     recip_fp = blob[pos:pos + RECIP_FP_LEN].decode("ascii")
                     return {"ok": True, "version": 2, "recip_fp": recip_fp}
                 raise ValueError(f"Unknown .empy version: {ver}")

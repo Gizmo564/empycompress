@@ -52,7 +52,7 @@ jobs:
           from PIL import Image
           import os
           os.makedirs('icon.iconset', exist_ok=True)
-          src = Image.open('assets/icon.png').convert('RGBA')
+          src = Image.open('icon.png').convert('RGBA')
           sizes = [
               ('icon_16x16.png',      16),
               ('icon_16x16@2x.png',   32),
@@ -68,7 +68,7 @@ jobs:
               src.resize((size, size), Image.LANCZOS).save(f'icon.iconset/{name}', format='PNG')
           print('Iconset written')
           "
-          iconutil -c icns icon.iconset -o assets/icon.icns
+          iconutil -c icns icon.iconset -o icon.icns
 
       - name: Build Linux icon
         if: runner.os == 'Linux'
@@ -76,17 +76,17 @@ jobs:
           pip install pillow -q
           python3 -c "
           from PIL import Image
-          img = Image.open('assets/icon.png').convert('RGBA')
-          img.save('assets/icon.png')
+          img = Image.open('icon.png').convert('RGBA')
+          img.save('icon.png')
           "
 
       - name: Compile Linux and macOS
         if: runner.os != 'Windows'
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
-            python -m nuitka --onefile --assume-yes-for-downloads --remove-output --output-filename=out --macos-app-icon=assets/icon.icns empy.py
+            python -m nuitka --onefile --assume-yes-for-downloads --remove-output --output-filename=out --macos-app-icon=icon.icns empy.py
           else
-            python -m nuitka --onefile --assume-yes-for-downloads --remove-output --output-filename=out --linux-icon=assets/icon.png empy.py
+            python -m nuitka --onefile --assume-yes-for-downloads --remove-output --output-filename=out --linux-icon=icon.png empy.py
           fi
           chmod +x out
           mv out ${{ matrix.artifact }}
@@ -99,16 +99,16 @@ jobs:
           pip install pillow -q
           python3 -c "
           from PIL import Image
-          img = Image.open('assets/icon.png').convert('RGBA')
+          img = Image.open('icon.png').convert('RGBA')
           sizes = [(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)]
-          img.save('assets/icon.ico', sizes=sizes)
+          img.save('icon.ico', sizes=sizes)
           "
 
       - name: Compile Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          python -m nuitka --onefile --mingw64 --assume-yes-for-downloads --remove-output --output-filename=out.exe --windows-icon-from-ico=assets/icon.ico empy.py
+          python -m nuitka --onefile --mingw64 --assume-yes-for-downloads --remove-output --output-filename=out.exe --windows-icon-from-ico=icon.ico empy.py
           Move-Item out.exe ${{ matrix.artifact }}
 
       - name: Test Linux and macOS
