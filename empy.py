@@ -67,7 +67,7 @@ from cryptography.exceptions import InvalidTag
 MAGIC        = b"EMPY"
 VERSION_V1   = 1     # standard encrypted file
 VERSION_V2   = 2     # peer-sealed (double-encrypted) file
-PROG_VERSION = "3.5.2"
+PROG_VERSION = "3.5.1"
 
 SALT_LEN     = 32
 NONCE_LEN    = 12
@@ -670,290 +670,477 @@ def _privkey_from_str(json_str: str, password: str) -> tuple[bytes, str]:
 #  GUI — embedded single-page app
 # ─────────────────────────────────────────────────────
 
-_GUI_HTML = r"""<!DOCTYPE html>
+_GUI_HTML = r"""!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>empy</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,300&display=swap" rel="stylesheet">
+<title>empy — Empyrean Secure Compression</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#06060e;--surface:#0d0d1c;--surface2:#13132b;
-  --border:rgba(0,255,136,.12);--border-hi:rgba(0,255,136,.4);
-  --accent:#00ff88;--adim:rgba(0,255,136,.12);
-  --blue:#4488ff;--bdim:rgba(68,136,255,.12);
-  --txt:#c8d4f0;--muted:#424866;--err:#ff4466;--warn:#ffaa00;
-  --r:4px;--font:'JetBrains Mono',monospace
+
+html,body{
+  height:100%;
+  background:#008080;
+  font-family:'MS Sans Serif',Arial,sans-serif;
+  font-size:11px;
+  color:#000;
+  overflow:hidden;
 }
-html,body{height:100%;background:var(--bg);color:var(--txt);font-family:var(--font);font-size:13px;overflow:hidden}
-body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.025) 2px,rgba(0,0,0,.025) 4px);pointer-events:none;z-index:999}
-.app{display:grid;grid-template-columns:190px 1fr;grid-template-rows:46px 1fr 26px;height:100vh}
 
-/* title bar */
-.tb{grid-column:1/-1;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:14px;user-select:none}
-.logo{color:var(--accent);font-size:15px;font-weight:700;letter-spacing:5px;text-shadow:0 0 20px rgba(0,255,136,.5)}
-.logo-sub{color:var(--muted);font-size:10px;font-weight:300;letter-spacing:.5px}
-.tb-right{margin-left:auto;color:var(--accent);font-size:10px;letter-spacing:1px}
-.tb-right span{animation:blink 1.8s step-end infinite}
-@keyframes blink{50%{opacity:0}}
+/* ── Main window ────────────────────── */
+.win{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:min(800px,98vw);
+  height:min(600px,97vh);
+  background:#c0c0c0;
+  display:flex;
+  flex-direction:column;
+  border-top:2px solid #fff;
+  border-left:2px solid #fff;
+  border-right:2px solid #404040;
+  border-bottom:2px solid #404040;
+  box-shadow:2px 2px 0 #000;
+}
 
-/* sidebar */
-.sb{background:var(--surface);border-right:1px solid var(--border);padding:10px 0;display:flex;flex-direction:column;gap:1px;overflow-y:auto}
-.ni{display:flex;align-items:center;gap:9px;padding:9px 15px;cursor:pointer;color:var(--muted);font-size:11px;letter-spacing:1.5px;border-left:2px solid transparent;transition:all .14s;user-select:none}
-.ni:hover{color:var(--txt);background:var(--adim)}
-.ni.on{color:var(--accent);border-left-color:var(--accent);background:var(--adim)}
-.ni-icon{font-size:13px;width:17px;text-align:center}
-.ndiv{height:1px;background:var(--border);margin:7px 14px}
+/* ── Title bar ──────────────────────── */
+.tbar{
+  background:linear-gradient(90deg,#000080 0%,#1084d0 100%);
+  color:#fff;
+  display:flex;
+  align-items:center;
+  padding:3px 4px;
+  gap:4px;
+  flex-shrink:0;
+  user-select:none;
+}
+.tbar-icon{font-size:14px;margin-right:2px}
+.tbar-title{flex:1;font-weight:700;font-size:11px;letter-spacing:.3px}
+.tbar-btns{display:flex;gap:2px}
+.tbtn{
+  width:16px;height:14px;
+  background:#c0c0c0;color:#000;
+  font-size:9px;font-weight:900;
+  display:flex;align-items:center;justify-content:center;
+  cursor:default;line-height:1;
+  border-top:1px solid #fff;border-left:1px solid #fff;
+  border-right:1px solid #404040;border-bottom:1px solid #404040;
+}
+.tbtn:active{
+  border-top:1px solid #404040;border-left:1px solid #404040;
+  border-right:1px solid #fff;border-bottom:1px solid #fff;
+  padding-top:1px;padding-left:1px;
+}
 
-/* main */
-.main{overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:18px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
-.panel{display:none;flex-direction:column;gap:16px}
+/* ── Menu bar ───────────────────────── */
+.mbar{
+  background:#c0c0c0;
+  display:flex;padding:2px 2px 0;gap:0;
+  flex-shrink:0;border-bottom:1px solid #808080;
+}
+.mitem{
+  padding:2px 8px 3px;cursor:default;font-size:11px;
+  border:1px solid transparent;
+}
+.mitem:hover{
+  background:#000080;color:#fff;
+  border:1px solid #000;
+}
+
+/* ── Tab strip ──────────────────────── */
+.tabs{
+  display:flex;padding:5px 6px 0;gap:2px;
+  flex-shrink:0;background:#c0c0c0;
+  border-bottom:2px solid #808080;
+}
+.tab{
+  padding:3px 11px 4px;font-size:11px;cursor:default;
+  background:#a8a8a8;color:#000;
+  border-top:2px solid #fff;border-left:2px solid #fff;
+  border-right:2px solid #808080;
+  border-bottom:none;
+  position:relative;top:2px;z-index:0;
+  white-space:nowrap;
+  margin-bottom:-2px;
+}
+.tab.on{
+  background:#c0c0c0;font-weight:700;
+  z-index:2;top:0;padding-top:4px;
+  border-bottom:2px solid #c0c0c0;
+}
+.tab:hover:not(.on){background:#b8b8b8}
+
+/* ── Content area ───────────────────── */
+.content{
+  flex:1;overflow-y:auto;
+  padding:12px;background:#c0c0c0;
+}
+
+/* ── Panel ──────────────────────────── */
+.panel{display:none;flex-direction:column;gap:10px}
 .panel.on{display:flex}
 
-.pt{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:3px;padding-bottom:11px;border-bottom:1px solid var(--border)}
-.pt em{color:var(--accent);font-style:normal}
+/* ── Group box ──────────────────────── */
+.grp{
+  border:2px groove #c0c0c0;
+  border-top-color:#808080;border-left-color:#808080;
+  border-right-color:#fff;border-bottom-color:#fff;
+  padding:10px 10px 10px;
+  position:relative;margin-top:10px;
+}
+.grp-lbl{
+  position:absolute;top:-8px;left:8px;
+  background:#c0c0c0;padding:0 4px;
+  font-size:11px;font-weight:700;
+}
 
-/* drop zone */
-.dz{border:1px dashed rgba(0,255,136,.2);border-radius:var(--r);padding:28px;text-align:center;cursor:pointer;transition:all .18s;background:var(--surface);position:relative}
-.dz:hover,.dz.over{border-color:var(--accent);background:var(--adim)}
-.dz.has{border-style:solid;border-color:rgba(0,255,136,.35);background:rgba(0,255,136,.04)}
-.dz-icon{font-size:22px;margin-bottom:7px;opacity:.45}
-.dz-txt{color:var(--muted);font-size:11px;line-height:1.5}
-.dz-name{color:var(--accent);font-size:12px;font-weight:500}
-.dz-sz{color:var(--muted);font-size:10px;margin-top:2px}
+/* ── Drop zone ──────────────────────── */
+.dz{
+  background:#fff;min-height:54px;
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:4px;
+  cursor:default;position:relative;
+  border-top:2px solid #808080;border-left:2px solid #808080;
+  border-right:2px solid #fff;border-bottom:2px solid #fff;
+}
+.dz.over{background:#000080;color:#fff}
+.dz.has{background:#f8f8f8}
+.dz-icon{font-size:22px}
+.dz-txt{font-size:11px;color:#444;text-align:center;padding:0 8px}
+.dz-name{font-size:11px;color:#000080;font-weight:700}
+.dz-sz{font-size:10px;color:#666}
 input[type=file]{display:none}
 
-/* fields */
-.field{display:flex;flex-direction:column;gap:5px}
-.fl{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--muted)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+/* ── Label ──────────────────────────── */
+.lbl{font-size:11px;font-weight:700;margin-bottom:2px}
+
+/* ── Input field ────────────────────── */
+.inp{
+  background:#fff;
+  border-top:2px solid #808080;border-left:2px solid #808080;
+  border-right:2px solid #fff;border-bottom:2px solid #fff;
+  padding:3px 5px;
+  font-family:'MS Sans Serif',Arial,sans-serif;
+  font-size:11px;color:#000;
+  outline:none;width:100%;
+}
+.inp:focus{outline:1px dotted #000;outline-offset:-3px}
 .pw{position:relative}
-.pw .inp{padding-right:38px}
-.eye{position:absolute;right:9px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0;transition:color .14s}
-.eye:hover{color:var(--accent)}
-.inp{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:8px 11px;color:var(--txt);font-family:var(--font);font-size:13px;outline:none;width:100%;transition:border-color .14s,box-shadow .14s}
-.inp:focus{border-color:rgba(0,255,136,.45);box-shadow:0 0 0 2px rgba(0,255,136,.07)}
-.inp::placeholder{color:var(--muted)}
+.pw .inp{padding-right:30px}
+.eye{
+  position:absolute;right:3px;top:50%;transform:translateY(-50%);
+  background:#c0c0c0;
+  border-top:1px solid #fff;border-left:1px solid #fff;
+  border-right:1px solid #404040;border-bottom:1px solid #404040;
+  width:22px;height:18px;font-size:10px;
+  cursor:default;display:flex;align-items:center;justify-content:center;
+}
+.eye:active{
+  border-top:1px solid #404040;border-left:1px solid #404040;
+  border-right:1px solid #fff;border-bottom:1px solid #fff;
+}
 
-/* buttons */
-.btn{background:none;border:1px solid var(--border-hi);border-radius:var(--r);padding:10px 18px;color:var(--accent);font-family:var(--font);font-size:11px;font-weight:700;letter-spacing:2px;cursor:pointer;transition:all .14s;display:flex;align-items:center;justify-content:center;gap:8px;width:100%}
-.btn:hover{background:var(--adim);box-shadow:0 0 18px rgba(0,255,136,.18)}
-.btn:active{transform:scale(.98)}
-.btn:disabled{opacity:.3;pointer-events:none}
-.btn.blue{border-color:rgba(68,136,255,.5);color:var(--blue)}
-.btn.blue:hover{background:var(--bdim);box-shadow:0 0 18px rgba(68,136,255,.18)}
+/* ── Buttons ────────────────────────── */
+.btn{
+  background:#c0c0c0;
+  border-top:2px solid #fff;border-left:2px solid #fff;
+  border-right:2px solid #404040;border-bottom:2px solid #404040;
+  padding:4px 18px;
+  font-family:'MS Sans Serif',Arial,sans-serif;
+  font-size:11px;color:#000;cursor:default;
+  min-width:96px;
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  white-space:nowrap;
+}
+.btn:active{
+  border-top:2px solid #404040;border-left:2px solid #404040;
+  border-right:2px solid #fff;border-bottom:2px solid #fff;
+  padding:5px 17px 3px 19px;
+}
+.btn:disabled{color:#808080;pointer-events:none}
+.btn-row{display:flex;gap:8px;justify-content:flex-start;padding-top:2px}
 
-/* console */
-.con{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:13px;min-height:76px;font-size:11px;line-height:1.65;white-space:pre-wrap;word-break:break-all}
-.ok{color:var(--accent)}.er{color:var(--err)}.dm{color:var(--muted)}.nfo{color:var(--blue)}
+/* ── Console ────────────────────────── */
+.con{
+  background:#000;color:#00cc00;
+  font-family:'Courier New',Courier,monospace;
+  font-size:11px;line-height:1.65;
+  padding:8px;min-height:76px;
+  white-space:pre-wrap;word-break:break-all;
+  border-top:2px solid #808080;border-left:2px solid #808080;
+  border-right:2px solid #fff;border-bottom:2px solid #fff;
+  overflow-y:auto;
+}
+.ok{color:#00ff00}.er{color:#ff5555}.dm{color:#aaaaaa}.nfo{color:#55aaff}
 
-/* download link */
-.dl{display:inline-flex;align-items:center;gap:7px;margin-top:6px;background:rgba(0,255,136,.07);border:1px solid rgba(0,255,136,.28);border-radius:var(--r);padding:7px 13px;color:var(--accent);cursor:pointer;font-family:var(--font);font-size:11px;font-weight:500;text-decoration:none;transition:all .14s}
-.dl:hover{background:rgba(0,255,136,.14)}
-.dl.b{background:rgba(68,136,255,.07);border-color:rgba(68,136,255,.3);color:var(--blue)}
-.dl.b:hover{background:rgba(68,136,255,.14)}
+/* ── Download link ──────────────────── */
+.dl{
+  display:inline-flex;align-items:center;gap:5px;
+  color:#fff;text-decoration:underline;
+  cursor:default;font-family:'Courier New',monospace;font-size:11px;
+}
+.dl:hover{color:#ffff55}
 
-/* spinner */
-.spin{display:inline-block;width:11px;height:11px;border:2px solid rgba(0,255,136,.2);border-top-color:var(--accent);border-radius:50%;animation:rot .65s linear infinite;vertical-align:middle;margin-left:6px}
-@keyframes rot{to{transform:rotate(360deg)}}
+/* ── Grid 2-col ─────────────────────── */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 
-/* status bar */
-.stbar{grid-column:1/-1;background:var(--surface);border-top:1px solid var(--border);padding:0 15px;display:flex;align-items:center;gap:12px;font-size:10px;color:var(--muted)}
-.dot{width:5px;height:5px;border-radius:50%;background:var(--accent);box-shadow:0 0 7px var(--accent);flex-shrink:0}
+/* ── Field wrapper ──────────────────── */
+.field{display:flex;flex-direction:column;gap:3px}
 
-::-webkit-scrollbar{width:3px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+/* ── Status bar ─────────────────────── */
+.sbar{
+  display:flex;gap:2px;padding:2px 4px;
+  flex-shrink:0;border-top:2px solid #808080;
+}
+.sp{
+  border-top:1px solid #808080;border-left:1px solid #808080;
+  border-right:1px solid #fff;border-bottom:1px solid #fff;
+  padding:1px 6px;font-size:11px;
+}
 
-@media(max-width:660px){
-  .app{grid-template-columns:1fr}
-  .sb{flex-direction:row;overflow-x:auto;border-right:none;border-bottom:1px solid var(--border);padding:0}
-  .ni{border-left:none;border-bottom:2px solid transparent;flex-direction:column;gap:2px;font-size:9px;padding:8px 11px;min-width:52px;white-space:nowrap}
-  .ni.on{border-bottom-color:var(--accent);border-left-color:transparent}
-  .ndiv{display:none}
+/* ── Busy blink ─────────────────────── */
+.busy{animation:bl .55s step-end infinite}
+@keyframes bl{50%{opacity:0}}
+
+/* ── Scrollbar (Win98 style) ────────── */
+::-webkit-scrollbar{width:16px}
+::-webkit-scrollbar-track{background:#c0c0c0}
+::-webkit-scrollbar-thumb{
+  background:#c0c0c0;
+  border-top:1px solid #fff;border-left:1px solid #fff;
+  border-right:1px solid #404040;border-bottom:1px solid #404040;
+  min-height:20px;
+}
+::-webkit-scrollbar-button{
+  background:#c0c0c0;display:block;height:16px;
+  border-top:1px solid #fff;border-left:1px solid #fff;
+  border-right:1px solid #404040;border-bottom:1px solid #404040;
+}
+
+@media(max-width:600px){
   .grid2{grid-template-columns:1fr}
+  .tabs{flex-wrap:wrap}
 }
 </style>
 </head>
 <body>
-<div class="app">
+<div class="win">
 
-<!-- TITLE BAR -->
-<div class="tb">
-  <div class="logo">EMPY</div>
-  <div class="logo-sub">Empyrean Secure Compression &nbsp;·&nbsp; v__VERSION__ &nbsp;·&nbsp; Copyright Volvi 2026</div>
-  <div class="tb-right">&#x25CF; SECURE<span>_</span></div>
+<!-- Title bar -->
+<div class="tbar">
+  <span class="tbar-icon">🔐</span>
+  <span class="tbar-title">empy — Empyrean Secure Compression v__VERSION__</span>
+  <div class="tbar-btns">
+    <div class="tbtn">_</div>
+    <div class="tbtn">&#9633;</div>
+    <div class="tbtn">&#x2715;</div>
+  </div>
 </div>
 
-<!-- SIDEBAR -->
-<nav class="sb">
-  <div class="ni on" data-p="encrypt"><span class="ni-icon">&#x1F510;</span>ENCRYPT</div>
-  <div class="ni"    data-p="decrypt"><span class="ni-icon">&#x1F513;</span>DECRYPT</div>
-  <div class="ndiv"></div>
-  <div class="ni"    data-p="keygen"><span class="ni-icon">&#x1F5DD;</span>KEYGEN</div>
-  <div class="ni"    data-p="seal"><span class="ni-icon">&#x1F4E8;</span>SEAL</div>
-  <div class="ni"    data-p="open"><span class="ni-icon">&#x1F4EC;</span>OPEN</div>
-  <div class="ndiv"></div>
-  <div class="ni"    data-p="info"><span class="ni-icon">&#x1F50D;</span>INFO</div>
-</nav>
+<!-- Menu bar -->
+<div class="mbar">
+  <span class="mitem"><u>F</u>ile</span>
+  <span class="mitem"><u>E</u>dit</span>
+  <span class="mitem"><u>V</u>iew</span>
+  <span class="mitem"><u>S</u>ecurity</span>
+  <span class="mitem"><u>H</u>elp</span>
+</div>
 
-<!-- MAIN -->
-<main class="main">
+<!-- Tab strip -->
+<div class="tabs">
+  <div class="tab on"  data-p="encrypt">&#x1F512; Encrypt</div>
+  <div class="tab"     data-p="decrypt">&#x1F513; Decrypt</div>
+  <div class="tab"     data-p="keygen">&#x1F5DD; Keygen</div>
+  <div class="tab"     data-p="seal">&#x1F4E8; Seal</div>
+  <div class="tab"     data-p="open">&#x1F4EC; Open</div>
+  <div class="tab"     data-p="info">&#x1F50D; Info</div>
+</div>
+
+<!-- Content -->
+<div class="content">
 
 <!-- ENCRYPT -->
 <div class="panel on" id="p-encrypt">
-  <div class="pt"><em>ENCRYPT</em> &nbsp;&#xB7;&nbsp; STANDARD PASSWORD ENCRYPTION</div>
-  <div class="dz" id="dz-encrypt" onclick="pick('encrypt')">
-    <input type="file" id="fi-encrypt" onchange="fromInput('encrypt',this)">
-    <div class="dz-icon">&#x1F4C2;</div>
-    <div class="dz-txt" id="dt-encrypt">Drop any file here, or click to select</div>
+  <div class="grp"><span class="grp-lbl">File Selection</span>
+    <div class="dz" id="dz-encrypt" onclick="pick('encrypt')">
+      <input type="file" id="fi-encrypt" onchange="fromInput('encrypt',this)">
+      <div class="dz-icon">&#x1F4C2;</div>
+      <div class="dz-txt" id="dt-encrypt">Click to select a file, or drag and drop here</div>
+    </div>
   </div>
-  <div class="field"><div class="fl">PASSWORD <span style="color:#ff446680">*</span></div>
-    <div class="pw"><input class="inp" type="password" id="e-pw" placeholder="minimum 8 characters">
-    <button class="eye" onclick="tog('e-pw',this)">&#x25C9;</button></div></div>
-  <div class="field"><div class="fl">CONFIRM PASSWORD</div>
-    <div class="pw"><input class="inp" type="password" id="e-pw2" placeholder="confirm password">
-    <button class="eye" onclick="tog('e-pw2',this)">&#x25C9;</button></div></div>
-  <button class="btn" onclick="doEncrypt()">&#x1F510; &nbsp;ENCRYPT FILE</button>
-  <div class="con" id="con-encrypt"><span class="dm">Ready &mdash; select a file and set a password.</span></div>
+  <div class="grp"><span class="grp-lbl">Encryption Password</span>
+    <div class="field"><div class="lbl">Password:</div>
+      <div class="pw"><input class="inp" type="password" id="e-pw" placeholder="Minimum 8 characters">
+        <button class="eye" onclick="tog('e-pw',this)">&#x1F441;</button></div></div>
+    <div class="field" style="margin-top:6px"><div class="lbl">Confirm Password:</div>
+      <div class="pw"><input class="inp" type="password" id="e-pw2" placeholder="Re-enter password">
+        <button class="eye" onclick="tog('e-pw2',this)">&#x1F441;</button></div></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn" onclick="doEncrypt()">&#x1F512;&nbsp; Encrypt File</button>
+  </div>
+  <div class="con" id="con-encrypt"><span class="dm">C:\EMPY> Ready. Select a file and enter a password.</span></div>
 </div>
 
 <!-- DECRYPT -->
 <div class="panel" id="p-decrypt">
-  <div class="pt"><em>DECRYPT</em> &nbsp;&#xB7;&nbsp; STANDARD FILE DECRYPTION</div>
-  <div class="dz" id="dz-decrypt" onclick="pick('decrypt')">
-    <input type="file" id="fi-decrypt" accept=".empy" onchange="fromInput('decrypt',this)">
-    <div class="dz-icon">&#x1F512;</div>
-    <div class="dz-txt" id="dt-decrypt">Drop a .empy file here, or click to select</div>
+  <div class="grp"><span class="grp-lbl">Encrypted File (.empy)</span>
+    <div class="dz" id="dz-decrypt" onclick="pick('decrypt')">
+      <input type="file" id="fi-decrypt" accept=".empy" onchange="fromInput('decrypt',this)">
+      <div class="dz-icon">&#x1F510;</div>
+      <div class="dz-txt" id="dt-decrypt">Click to select .empy file, or drag and drop here</div>
+    </div>
   </div>
-  <div class="field"><div class="fl">PASSWORD</div>
-    <div class="pw"><input class="inp" type="password" id="d-pw" placeholder="enter your password">
-    <button class="eye" onclick="tog('d-pw',this)">&#x25C9;</button></div></div>
-  <button class="btn" onclick="doDecrypt()">&#x1F513; &nbsp;DECRYPT FILE</button>
-  <div class="con" id="con-decrypt"><span class="dm">Ready &mdash; select a .empy file and enter the password.</span></div>
+  <div class="grp"><span class="grp-lbl">Password</span>
+    <div class="field"><div class="lbl">Password:</div>
+      <div class="pw"><input class="inp" type="password" id="d-pw" placeholder="Enter your password">
+        <button class="eye" onclick="tog('d-pw',this)">&#x1F441;</button></div></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn" onclick="doDecrypt()">&#x1F513;&nbsp; Decrypt File</button>
+  </div>
+  <div class="con" id="con-decrypt"><span class="dm">C:\EMPY> Ready. Select a .empy file and enter the password.</span></div>
 </div>
 
 <!-- KEYGEN -->
 <div class="panel" id="p-keygen">
-  <div class="pt"><em>KEYGEN</em> &nbsp;&#xB7;&nbsp; GENERATE X25519 KEYPAIR</div>
-  <div class="field"><div class="fl">YOUR NAME / ALIAS</div>
-    <input class="inp" type="text" id="kg-name" placeholder="e.g.  alice"></div>
-  <div class="field"><div class="fl">KEY PROTECTION PASSWORD</div>
-    <div class="pw"><input class="inp" type="password" id="kg-pw" placeholder="protects your private key file">
-    <button class="eye" onclick="tog('kg-pw',this)">&#x25C9;</button></div></div>
-  <div class="field"><div class="fl">CONFIRM PASSWORD</div>
-    <div class="pw"><input class="inp" type="password" id="kg-pw2" placeholder="confirm">
-    <button class="eye" onclick="tog('kg-pw2',this)">&#x25C9;</button></div></div>
-  <button class="btn" onclick="doKeygen()">&#x1F5DD; &nbsp;GENERATE KEYPAIR</button>
-  <div class="con" id="con-keygen"><span class="dm">Generates a .empy.pub (share freely) and .empy.key (keep secret).</span></div>
+  <div class="grp"><span class="grp-lbl">Identity</span>
+    <div class="field"><div class="lbl">Your Name / Alias:</div>
+      <input class="inp" type="text" id="kg-name" placeholder="e.g.  alice"></div>
+  </div>
+  <div class="grp"><span class="grp-lbl">Key Protection Password</span>
+    <div class="field"><div class="lbl">Password:</div>
+      <div class="pw"><input class="inp" type="password" id="kg-pw" placeholder="Protects your private key file">
+        <button class="eye" onclick="tog('kg-pw',this)">&#x1F441;</button></div></div>
+    <div class="field" style="margin-top:6px"><div class="lbl">Confirm Password:</div>
+      <div class="pw"><input class="inp" type="password" id="kg-pw2" placeholder="Confirm">
+        <button class="eye" onclick="tog('kg-pw2',this)">&#x1F441;</button></div></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn" onclick="doKeygen()">&#x1F5DD;&nbsp; Generate Keypair</button>
+  </div>
+  <div class="con" id="con-keygen"><span class="dm">C:\EMPY> Generates a .empy.pub (share freely) and .empy.key (keep secret).</span></div>
 </div>
 
 <!-- SEAL -->
 <div class="panel" id="p-seal">
-  <div class="pt"><em>SEAL</em> &nbsp;&#xB7;&nbsp; PEER-ENCRYPT FOR A SPECIFIC RECIPIENT</div>
-  <div class="dz" id="dz-seal" onclick="pick('seal')">
-    <input type="file" id="fi-seal" onchange="fromInput('seal',this)">
-    <div class="dz-icon">&#x1F4C4;</div>
-    <div class="dz-txt" id="dt-seal">Drop the file to seal</div>
+  <div class="grp"><span class="grp-lbl">File to Seal</span>
+    <div class="dz" id="dz-seal" onclick="pick('seal')">
+      <input type="file" id="fi-seal" onchange="fromInput('seal',this)">
+      <div class="dz-icon">&#x1F4C4;</div>
+      <div class="dz-txt" id="dt-seal">Click to select file, or drag and drop here</div>
+    </div>
   </div>
   <div class="grid2">
-    <div class="field"><div class="fl">RECIPIENT PUBLIC KEY (.empy.pub)</div>
-      <div class="dz" style="padding:14px" id="dz-spub" onclick="pick('spub')">
+    <div class="grp"><span class="grp-lbl">Recipient Public Key</span>
+      <div class="dz" style="min-height:40px;padding:8px" id="dz-spub" onclick="pick('spub')">
         <input type="file" id="fi-spub" onchange="fromInput('spub',this)">
-        <div class="dz-txt" id="dt-spub">Drop recipient .empy.pub</div>
+        <div class="dz-txt" id="dt-spub">Drop .empy.pub here</div>
       </div></div>
-    <div class="field"><div class="fl">YOUR PRIVATE KEY (.empy.key)</div>
-      <div class="dz" style="padding:14px" id="dz-skey" onclick="pick('skey')">
+    <div class="grp"><span class="grp-lbl">Your Private Key</span>
+      <div class="dz" style="min-height:40px;padding:8px" id="dz-skey" onclick="pick('skey')">
         <input type="file" id="fi-skey" onchange="fromInput('skey',this)">
-        <div class="dz-txt" id="dt-skey">Drop your .empy.key</div>
+        <div class="dz-txt" id="dt-skey">Drop .empy.key here</div>
       </div></div>
   </div>
-  <div class="field"><div class="fl">KEY PROTECTION PASSWORD</div>
-    <div class="pw"><input class="inp" type="password" id="s-kpw" placeholder="unlocks your .empy.key">
-    <button class="eye" onclick="tog('s-kpw',this)">&#x25C9;</button></div></div>
-  <div class="grid2">
-    <div class="field"><div class="fl">PEER PASSWORD (outer layer)</div>
-      <div class="pw"><input class="inp" type="password" id="s-ppw" placeholder="share with recipient">
-      <button class="eye" onclick="tog('s-ppw',this)">&#x25C9;</button></div></div>
-    <div class="field"><div class="fl">BASE PASSWORD (inner layer)</div>
-      <div class="pw"><input class="inp" type="password" id="s-bpw" placeholder="share with recipient">
-      <button class="eye" onclick="tog('s-bpw',this)">&#x25C9;</button></div></div>
+  <div class="grp"><span class="grp-lbl">Passwords</span>
+    <div class="grid2">
+      <div class="field"><div class="lbl">Key Protection Password:</div>
+        <div class="pw"><input class="inp" type="password" id="s-kpw" placeholder="Unlocks your .empy.key">
+          <button class="eye" onclick="tog('s-kpw',this)">&#x1F441;</button></div></div>
+      <div class="field"><div class="lbl">Peer Password (outer layer):</div>
+        <div class="pw"><input class="inp" type="password" id="s-ppw" placeholder="Share with recipient">
+          <button class="eye" onclick="tog('s-ppw',this)">&#x1F441;</button></div></div>
+      <div class="field"><div class="lbl">Base Password (inner layer):</div>
+        <div class="pw"><input class="inp" type="password" id="s-bpw" placeholder="Share with recipient">
+          <button class="eye" onclick="tog('s-bpw',this)">&#x1F441;</button></div></div>
+    </div>
   </div>
-  <button class="btn" onclick="doSeal()">&#x1F4E8; &nbsp;SEAL FILE</button>
-  <div class="con" id="con-seal"><span class="dm">Double-layer: X25519-ECDH outer + AES-256-GCM inner. Needs 3 secrets to open.</span></div>
+  <div class="btn-row">
+    <button class="btn" onclick="doSeal()">&#x1F4E8;&nbsp; Seal File</button>
+  </div>
+  <div class="con" id="con-seal"><span class="dm">C:\EMPY> Double-layer: X25519-ECDH outer + AES-256-GCM inner.</span></div>
 </div>
 
 <!-- OPEN -->
 <div class="panel" id="p-open">
-  <div class="pt"><em>OPEN</em> &nbsp;&#xB7;&nbsp; PEER-DECRYPT A SEALED FILE</div>
-  <div class="dz" id="dz-open" onclick="pick('open')">
-    <input type="file" id="fi-open" accept=".empy" onchange="fromInput('open',this)">
-    <div class="dz-icon">&#x1F4EC;</div>
-    <div class="dz-txt" id="dt-open">Drop the sealed .empy file</div>
+  <div class="grp"><span class="grp-lbl">Sealed File (.empy)</span>
+    <div class="dz" id="dz-open" onclick="pick('open')">
+      <input type="file" id="fi-open" accept=".empy" onchange="fromInput('open',this)">
+      <div class="dz-icon">&#x1F4EC;</div>
+      <div class="dz-txt" id="dt-open">Click to select sealed .empy file</div>
+    </div>
   </div>
-  <div class="field"><div class="fl">YOUR PRIVATE KEY (.empy.key)</div>
-    <div class="dz" style="padding:14px" id="dz-okey" onclick="pick('okey')">
+  <div class="grp"><span class="grp-lbl">Your Private Key</span>
+    <div class="dz" style="min-height:40px;padding:8px" id="dz-okey" onclick="pick('okey')">
       <input type="file" id="fi-okey" onchange="fromInput('okey',this)">
-      <div class="dz-txt" id="dt-okey">Drop your .empy.key</div>
-    </div></div>
-  <div class="field"><div class="fl">KEY PROTECTION PASSWORD</div>
-    <div class="pw"><input class="inp" type="password" id="o-kpw" placeholder="unlocks your .empy.key">
-    <button class="eye" onclick="tog('o-kpw',this)">&#x25C9;</button></div></div>
-  <div class="grid2">
-    <div class="field"><div class="fl">PEER PASSWORD (outer layer)</div>
-      <div class="pw"><input class="inp" type="password" id="o-ppw" placeholder="from sender">
-      <button class="eye" onclick="tog('o-ppw',this)">&#x25C9;</button></div></div>
-    <div class="field"><div class="fl">BASE PASSWORD (inner layer)</div>
-      <div class="pw"><input class="inp" type="password" id="o-bpw" placeholder="from sender">
-      <button class="eye" onclick="tog('o-bpw',this)">&#x25C9;</button></div></div>
+      <div class="dz-txt" id="dt-okey">Drop your .empy.key here</div>
+    </div>
   </div>
-  <button class="btn blue" onclick="doOpen()">&#x1F4EC; &nbsp;OPEN FILE</button>
-  <div class="con" id="con-open"><span class="dm">Requires your private key + key password + peer password + base password.</span></div>
+  <div class="grp"><span class="grp-lbl">Passwords</span>
+    <div class="grid2">
+      <div class="field"><div class="lbl">Key Protection Password:</div>
+        <div class="pw"><input class="inp" type="password" id="o-kpw" placeholder="Unlocks your .empy.key">
+          <button class="eye" onclick="tog('o-kpw',this)">&#x1F441;</button></div></div>
+      <div class="field"><div class="lbl">Peer Password (outer layer):</div>
+        <div class="pw"><input class="inp" type="password" id="o-ppw" placeholder="From sender">
+          <button class="eye" onclick="tog('o-ppw',this)">&#x1F441;</button></div></div>
+      <div class="field"><div class="lbl">Base Password (inner layer):</div>
+        <div class="pw"><input class="inp" type="password" id="o-bpw" placeholder="From sender">
+          <button class="eye" onclick="tog('o-bpw',this)">&#x1F441;</button></div></div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn" onclick="doOpen()">&#x1F4EC;&nbsp; Open File</button>
+  </div>
+  <div class="con" id="con-open"><span class="dm">C:\EMPY> Requires private key + key password + peer password + base password.</span></div>
 </div>
 
 <!-- INFO -->
 <div class="panel" id="p-info">
-  <div class="pt"><em>INFO</em> &nbsp;&#xB7;&nbsp; INSPECT FILE METADATA</div>
-  <div class="dz" id="dz-info" onclick="pick('info')">
-    <input type="file" id="fi-info" accept=".empy" onchange="fromInput('info',this)">
-    <div class="dz-icon">&#x1F50D;</div>
-    <div class="dz-txt" id="dt-info">Drop a .empy file to inspect</div>
+  <div class="grp"><span class="grp-lbl">File to Inspect</span>
+    <div class="dz" id="dz-info" onclick="pick('info')">
+      <input type="file" id="fi-info" accept=".empy" onchange="fromInput('info',this)">
+      <div class="dz-icon">&#x1F50D;</div>
+      <div class="dz-txt" id="dt-info">Click to select .empy file to inspect</div>
+    </div>
   </div>
-  <div class="field"><div class="fl">PASSWORD <span style="color:var(--muted)">(required for V1 files)</span></div>
-    <div class="pw"><input class="inp" type="password" id="i-pw" placeholder="enter password to read metadata">
-    <button class="eye" onclick="tog('i-pw',this)">&#x25C9;</button></div></div>
-  <button class="btn" onclick="doInfo()">&#x1F50D; &nbsp;INSPECT FILE</button>
-  <div class="con" id="con-info"><span class="dm">V2 peer-sealed files show type info without a password.</span></div>
+  <div class="grp"><span class="grp-lbl">Password <span style="font-weight:400;color:#666">(required for V1 files)</span></span>
+    <div class="field"><div class="lbl">Password:</div>
+      <div class="pw"><input class="inp" type="password" id="i-pw" placeholder="Enter password to read metadata">
+        <button class="eye" onclick="tog('i-pw',this)">&#x1F441;</button></div></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn" onclick="doInfo()">&#x1F50D;&nbsp; Inspect File</button>
+  </div>
+  <div class="con" id="con-info"><span class="dm">C:\EMPY> V2 peer-sealed files show type info without a password.</span></div>
 </div>
 
-</main>
+</div><!-- /content -->
 
-<!-- STATUS BAR -->
-<div class="stbar">
-  <div class="dot"></div>
-  <span>LOCAL &nbsp;&bull;&nbsp; 127.0.0.1</span>
-  <span style="color:var(--border-hi)">&middot;</span>
-  <span id="stxt">Waiting for input</span>
+<!-- Status bar -->
+<div class="sbar">
+  <div class="sp" style="flex:1" id="stxt">Ready</div>
+  <div class="sp" style="flex:0 0 auto">AES-256-GCM | PBKDF2-SHA256</div>
+  <div class="sp" style="flex:0 0 auto;color:#00aa00;font-weight:700">&#9679; SECURE</div>
 </div>
-</div>
+
+</div><!-- /win -->
 
 <script>
-// ── file state ─────────────────────────────────────────────────
 const S = {};
 
-// ── navigation ─────────────────────────────────────────────────
-document.querySelectorAll('.ni').forEach(el => {
+document.querySelectorAll('.tab').forEach(el => {
   el.addEventListener('click', () => {
-    document.querySelectorAll('.ni').forEach(n => n.classList.remove('on'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('on'));
     el.classList.add('on');
     document.getElementById('p-' + el.dataset.p).classList.add('on');
   });
 });
 
-// ── drag & drop ────────────────────────────────────────────────
 ['encrypt','decrypt','seal','open','info','spub','skey','okey'].forEach(k => {
   const el = document.getElementById('dz-' + k);
   if (!el) return;
@@ -976,14 +1163,13 @@ function load(k, file) {
     S[k] = { name: file.name, size: file.size, b64 };
     const td = document.getElementById('dt-' + k);
     const dz = document.getElementById('dz-' + k);
-    if (td) td.innerHTML = `<div class="dz-name">${x(file.name)}</div><div class="dz-sz">${sz(file.size)}</div>`;
+    if (td) td.innerHTML = `<div class="dz-name">&#x1F4C4; ${x(file.name)}</div><div class="dz-sz">${sz(file.size)}</div>`;
     if (dz) dz.classList.add('has');
     st('Loaded: ' + file.name);
   };
   r.readAsArrayBuffer(file);
 }
 
-// ── helpers ────────────────────────────────────────────────────
 function x(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function sz(n){ if(n<1024) return n+' B'; if(n<1048576) return (n/1024).toFixed(1)+' KB'; if(n<1073741824) return (n/1048576).toFixed(1)+' MB'; return (n/1073741824).toFixed(1)+' GB'; }
 function st(m){ document.getElementById('stxt').textContent = m; }
@@ -991,7 +1177,7 @@ function st(m){ document.getElementById('stxt').textContent = m; }
 function tog(id, btn) {
   const el = document.getElementById(id);
   el.type = el.type === 'password' ? 'text' : 'password';
-  btn.textContent = el.type === 'password' ? '\u25C9' : '\u25CE';
+  btn.innerHTML = el.type === 'password' ? '&#x1F441;' : '&#x1F648;';
 }
 
 function clr(id, lines) {
@@ -1004,17 +1190,17 @@ function app(id, c, t) {
   el.scrollTop = el.scrollHeight;
 }
 function spin(id) {
-  clr(id, [['dm','Processing...']]);
-  document.getElementById('con-'+id).innerHTML += '<span class="spin"></span>';
+  clr(id, [['dm','C:\\EMPY> Working... ']]);
+  document.getElementById('con-'+id).innerHTML += '<span class="dm busy">&#x2588;</span>';
 }
 
-function dlLink(name, b64, blue) {
+function dlLink(name, b64) {
   const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
   const url = URL.createObjectURL(new Blob([bytes]));
   const a = document.createElement('a');
   a.href = url; a.download = name;
-  a.className = 'dl' + (blue ? ' b' : '');
-  a.innerHTML = '&#x2B07; DOWNLOAD &nbsp;' + x(name);
+  a.className = 'dl';
+  a.innerHTML = '&#x1F4BE; Save: ' + x(name);
   return a;
 }
 
@@ -1034,95 +1220,93 @@ async function api(action, payload) {
   return d;
 }
 
-// ── ENCRYPT ───────────────────────────────────────────────────
 async function doEncrypt() {
-  const f = S.encrypt, pw = document.getElementById('e-pw').value, pw2 = document.getElementById('e-pw2').value;
-  if (!f) return clr('encrypt',[['er','ERROR: No file selected.']]);
-  if (pw.length < 8) return clr('encrypt',[['er','ERROR: Password must be at least 8 characters.']]);
-  if (pw !== pw2) return clr('encrypt',[['er','ERROR: Passwords do not match.']]);
+  const f=S.encrypt, pw=document.getElementById('e-pw').value, pw2=document.getElementById('e-pw2').value;
+  if (!f)          return clr('encrypt',[['er','ERROR: No file selected.']]);
+  if (pw.length<8) return clr('encrypt',[['er','ERROR: Password must be at least 8 characters.']]);
+  if (pw!==pw2)    return clr('encrypt',[['er','ERROR: Passwords do not match.']]);
   try {
     spin('encrypt');
-    const r = await api('encrypt', {file_data:f.b64, filename:f.name, password:pw});
-    const el = document.getElementById('con-encrypt'); el.innerHTML = '';
-    app('encrypt','ok','&#x2713;  Encrypted successfully');
-    app('encrypt','dm','Original  : ' + sz(r.meta.original_size));
-    app('encrypt','dm','Output    : ' + r.filename);
-    app('encrypt','dm','SHA-256   : ' + r.meta.sha256.slice(0,16) + '...');
-    el.appendChild(dlLink(r.filename, r.file_data, false));
-    st('Encrypted: ' + r.filename);
-  } catch(e){ clr('encrypt',[['er','ERROR: '+e.message]]); st('Error'); }
+    const r = await api('encrypt',{file_data:f.b64,filename:f.name,password:pw});
+    const el = document.getElementById('con-encrypt'); el.innerHTML='';
+    app('encrypt','ok','[OK] Encrypted successfully.');
+    app('encrypt','dm','  Original : '+sz(r.meta.original_size));
+    app('encrypt','dm','  Output   : '+r.filename);
+    app('encrypt','dm','  SHA-256  : '+r.meta.sha256.slice(0,16)+'...');
+    el.appendChild(document.createTextNode('\n'));
+    el.appendChild(dlLink(r.filename, r.file_data));
+    st('Encrypted: '+r.filename);
+  } catch(e){ clr('encrypt',[['er','[ERROR] '+e.message]]); st('Error'); }
 }
 
-// ── DECRYPT ───────────────────────────────────────────────────
 async function doDecrypt() {
-  const f = S.decrypt, pw = document.getElementById('d-pw').value;
-  if (!f) return clr('decrypt',[['er','ERROR: No file selected.']]);
+  const f=S.decrypt, pw=document.getElementById('d-pw').value;
+  if (!f)  return clr('decrypt',[['er','ERROR: No file selected.']]);
   if (!pw) return clr('decrypt',[['er','ERROR: Enter a password.']]);
   try {
     spin('decrypt');
-    const r = await api('decrypt', {file_data:f.b64, password:pw});
-    const el = document.getElementById('con-decrypt'); el.innerHTML = '';
-    app('decrypt','ok','&#x2713;  Decrypted successfully');
-    app('decrypt','dm','File      : ' + r.meta.filename);
-    app('decrypt','dm','Size      : ' + sz(r.meta.original_size));
-    app('decrypt','dm','SHA-256   : ' + r.meta.sha256.slice(0,16) + '...  \u2714 verified');
-    app('decrypt','dm','Created   : ' + r.meta.created_at);
-    el.appendChild(dlLink(r.filename, r.file_data, false));
-    st('Decrypted: ' + r.filename);
-  } catch(e){ clr('decrypt',[['er','ERROR: '+e.message]]); st('Error'); }
+    const r = await api('decrypt',{file_data:f.b64,password:pw});
+    const el = document.getElementById('con-decrypt'); el.innerHTML='';
+    app('decrypt','ok','[OK] Decrypted successfully.');
+    app('decrypt','dm','  File    : '+r.meta.filename);
+    app('decrypt','dm','  Size    : '+sz(r.meta.original_size));
+    app('decrypt','dm','  SHA-256 : '+r.meta.sha256.slice(0,16)+'... [VERIFIED]');
+    app('decrypt','dm','  Created : '+r.meta.created_at);
+    el.appendChild(document.createTextNode('\n'));
+    el.appendChild(dlLink(r.filename, r.file_data));
+    st('Decrypted: '+r.filename);
+  } catch(e){ clr('decrypt',[['er','[ERROR] '+e.message]]); st('Error'); }
 }
 
-// ── KEYGEN ────────────────────────────────────────────────────
 async function doKeygen() {
-  const name = document.getElementById('kg-name').value.trim();
-  const pw = document.getElementById('kg-pw').value, pw2 = document.getElementById('kg-pw2').value;
-  if (!name) return clr('keygen',[['er','ERROR: Enter a name/alias.']]);
-  if (pw.length < 8) return clr('keygen',[['er','ERROR: Password must be at least 8 characters.']]);
-  if (pw !== pw2) return clr('keygen',[['er','ERROR: Passwords do not match.']]);
+  const name=document.getElementById('kg-name').value.trim();
+  const pw=document.getElementById('kg-pw').value, pw2=document.getElementById('kg-pw2').value;
+  if (!name)       return clr('keygen',[['er','ERROR: Enter a name/alias.']]);
+  if (pw.length<8) return clr('keygen',[['er','ERROR: Password must be at least 8 characters.']]);
+  if (pw!==pw2)    return clr('keygen',[['er','ERROR: Passwords do not match.']]);
   try {
     spin('keygen');
-    const r = await api('keygen', {name, key_password:pw});
-    const el = document.getElementById('con-keygen'); el.innerHTML = '';
-    app('keygen','ok',"&#x2713;  Keypair generated for '" + name + "'");
-    app('keygen','dm','Fingerprint: ' + r.fingerprint.slice(0,32) + '...');
-    app('keygen','nfo','Share .empy.pub freely. Keep .empy.key private.');
+    const r = await api('keygen',{name,key_password:pw});
+    const el = document.getElementById('con-keygen'); el.innerHTML='';
+    app('keygen','ok',"[OK] Keypair generated for '"+name+"'");
+    app('keygen','dm','  Fingerprint: '+r.fingerprint.slice(0,32)+'...');
+    app('keygen','nfo','  Share .empy.pub freely. Keep .empy.key private.');
     el.appendChild(document.createTextNode('\n'));
-    el.appendChild(dlLink(r.pub_filename, txtB64(r.pub_data), false));
+    el.appendChild(dlLink(r.pub_filename, txtB64(r.pub_data)));
     el.appendChild(document.createTextNode('\n'));
-    el.appendChild(dlLink(r.key_filename, txtB64(r.key_data), true));
-    st('Keypair generated: ' + name);
-  } catch(e){ clr('keygen',[['er','ERROR: '+e.message]]); st('Error'); }
+    el.appendChild(dlLink(r.key_filename, txtB64(r.key_data)));
+    st('Keypair generated: '+name);
+  } catch(e){ clr('keygen',[['er','[ERROR] '+e.message]]); st('Error'); }
 }
 
-// ── SEAL ──────────────────────────────────────────────────────
 async function doSeal() {
   const f=S.seal, pub=S.spub, key=S.skey;
   const kpw=document.getElementById('s-kpw').value;
   const ppw=document.getElementById('s-ppw').value;
   const bpw=document.getElementById('s-bpw').value;
-  if (!f)   return clr('seal',[['er','ERROR: No file selected.']]);
-  if (!pub) return clr('seal',[['er','ERROR: No recipient public key loaded.']]);
-  if (!key) return clr('seal',[['er','ERROR: No sender private key loaded.']]);
+  if (!f)         return clr('seal',[['er','ERROR: No file selected.']]);
+  if (!pub)       return clr('seal',[['er','ERROR: No recipient public key loaded.']]);
+  if (!key)       return clr('seal',[['er','ERROR: No sender private key loaded.']]);
   if (kpw.length<8) return clr('seal',[['er','ERROR: Key password must be at least 8 characters.']]);
   if (ppw.length<8) return clr('seal',[['er','ERROR: Peer password must be at least 8 characters.']]);
   if (bpw.length<8) return clr('seal',[['er','ERROR: Base password must be at least 8 characters.']]);
   try {
     spin('seal');
-    const r = await api('seal', {
-      file_data:f.b64, filename:f.name,
-      pub_key_b64:pub.b64, priv_key_b64:key.b64,
-      key_password:kpw, peer_password:ppw, base_password:bpw
+    const r = await api('seal',{
+      file_data:f.b64,filename:f.name,
+      pub_key_b64:pub.b64,priv_key_b64:key.b64,
+      key_password:kpw,peer_password:ppw,base_password:bpw
     });
-    const el = document.getElementById('con-seal'); el.innerHTML = '';
-    app('seal','ok','&#x2713;  File sealed successfully');
-    app('seal','dm','Recipient : ' + (r.recipient || ''));
-    app('seal','dm','SHA-256   : ' + r.meta.sha256.slice(0,16) + '...');
-    el.appendChild(dlLink(r.filename, r.file_data, false));
-    st('Sealed: ' + r.filename);
-  } catch(e){ clr('seal',[['er','ERROR: '+e.message]]); st('Error'); }
+    const el = document.getElementById('con-seal'); el.innerHTML='';
+    app('seal','ok','[OK] File sealed successfully.');
+    app('seal','dm','  Recipient : '+(r.recipient||''));
+    app('seal','dm','  SHA-256   : '+r.meta.sha256.slice(0,16)+'...');
+    el.appendChild(document.createTextNode('\n'));
+    el.appendChild(dlLink(r.filename, r.file_data));
+    st('Sealed: '+r.filename);
+  } catch(e){ clr('seal',[['er','[ERROR] '+e.message]]); st('Error'); }
 }
 
-// ── OPEN ──────────────────────────────────────────────────────
 async function doOpen() {
   const f=S.open, key=S.okey;
   const kpw=document.getElementById('o-kpw').value;
@@ -1135,44 +1319,44 @@ async function doOpen() {
   if (!bpw) return clr('open',[['er','ERROR: Enter base password.']]);
   try {
     spin('open');
-    const r = await api('open', {
-      file_data:f.b64, priv_key_b64:key.b64,
-      key_password:kpw, peer_password:ppw, base_password:bpw
+    const r = await api('open',{
+      file_data:f.b64,priv_key_b64:key.b64,
+      key_password:kpw,peer_password:ppw,base_password:bpw
     });
-    const el = document.getElementById('con-open'); el.innerHTML = '';
-    app('open','ok','&#x2713;  File opened successfully');
-    app('open','dm','Sender    : ' + (r.peer_meta.sender||'unknown'));
-    app('open','dm','File      : ' + r.meta.filename);
-    app('open','dm','Size      : ' + sz(r.meta.original_size));
-    app('open','dm','SHA-256   : ' + r.meta.sha256.slice(0,16) + '...  \u2714 verified');
-    el.appendChild(dlLink(r.filename, r.file_data, false));
-    st('Opened: ' + r.filename);
-  } catch(e){ clr('open',[['er','ERROR: '+e.message]]); st('Error'); }
+    const el = document.getElementById('con-open'); el.innerHTML='';
+    app('open','ok','[OK] File opened successfully.');
+    app('open','dm','  Sender  : '+(r.peer_meta.sender||'unknown'));
+    app('open','dm','  File    : '+r.meta.filename);
+    app('open','dm','  Size    : '+sz(r.meta.original_size));
+    app('open','dm','  SHA-256 : '+r.meta.sha256.slice(0,16)+'... [VERIFIED]');
+    el.appendChild(document.createTextNode('\n'));
+    el.appendChild(dlLink(r.filename, r.file_data));
+    st('Opened: '+r.filename);
+  } catch(e){ clr('open',[['er','[ERROR] '+e.message]]); st('Error'); }
 }
 
-// ── INFO ──────────────────────────────────────────────────────
 async function doInfo() {
   const f=S.info, pw=document.getElementById('i-pw').value;
   if (!f) return clr('info',[['er','ERROR: No file selected.']]);
   try {
     spin('info');
-    const r = await api('info', {file_data:f.b64, password:pw});
-    const el = document.getElementById('con-info'); el.innerHTML = '';
-    if (r.version === 1) {
-      app('info','ok','&#x2713;  V1 &mdash; Standard Encrypted File');
-      app('info','dm','Filename   : ' + r.meta.filename);
-      app('info','dm','Original   : ' + sz(r.meta.original_size));
-      app('info','dm','Compressed : ' + sz(r.meta.compressed_size));
-      app('info','dm','SHA-256    : ' + r.meta.sha256);
-      app('info','dm','Created    : ' + r.meta.created_at);
-      app('info','dm','Encryption : AES-256-GCM + PBKDF2-SHA256');
+    const r = await api('info',{file_data:f.b64,password:pw});
+    const el = document.getElementById('con-info'); el.innerHTML='';
+    if (r.version===1) {
+      app('info','ok','[OK] V1 -- Standard Encrypted File');
+      app('info','dm','  Filename   : '+r.meta.filename);
+      app('info','dm','  Original   : '+sz(r.meta.original_size));
+      app('info','dm','  Compressed : '+sz(r.meta.compressed_size));
+      app('info','dm','  SHA-256    : '+r.meta.sha256);
+      app('info','dm','  Created    : '+r.meta.created_at);
+      app('info','dm','  Encryption : AES-256-GCM + PBKDF2-SHA256');
     } else {
-      app('info','ok','&#x2713;  V2 &mdash; Peer-Sealed File (double-encrypted)');
-      app('info','dm','Recip. FP  : ' + r.recip_fp.slice(0,32) + '...');
-      app('info','nfo','Use OPEN tab to decrypt with your private key.');
+      app('info','ok','[OK] V2 -- Peer-Sealed File (double-encrypted)');
+      app('info','dm','  Recip. FP  : '+r.recip_fp.slice(0,32)+'...');
+      app('info','nfo','  Use OPEN tab to decrypt with your private key.');
     }
-    st('Inspected: ' + f.name);
-  } catch(e){ clr('info',[['er','ERROR: '+e.message]]); st('Error'); }
+    st('Inspected: '+f.name);
+  } catch(e){ clr('info',[['er','[ERROR] '+e.message]]); st('Error'); }
 }
 </script>
 </body>
