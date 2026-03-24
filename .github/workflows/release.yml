@@ -129,7 +129,37 @@ jobs:
           .\${{ matrix.artifact }} encrypt t.txt -p testpassword1 -f
           .\${{ matrix.artifact }} decrypt t.txt.empy -p testpassword1 --outdir o -f
 
-      - uses: actions/upload-artifact@v4
+      # Zip macOS and Linux binaries before upload so that the +x executable
+      # bit is preserved. actions/upload-artifact strips Unix permissions from
+      # raw files, so a plain binary would arrive in the release job as 644.
+      # Zip stores permissions internally and survives the round-trip intact.
+      - name: Package macOS binary
+        if: runner.os == 'macOS'
+        run: zip ${{ matrix.artifact }}.zip ${{ matrix.artifact }} install.sh
+
+      - name: Package Linux binary
+        if: runner.os == 'Linux'
+        run: zip ${{ matrix.artifact }}.zip ${{ matrix.artifact }}
+
+      - name: Upload macOS artifact
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.zip
+          if-no-files-found: error
+
+      - name: Upload Linux artifact
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.zip
+          if-no-files-found: error
+
+      - name: Upload Windows artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
@@ -155,16 +185,48 @@ jobs:
         with:
           name: empycompress ${{ github.ref_name }}
           body: |
-            Empyrean Secure Compression ${{ github.ref_name }}
+            ## Empyrean Secure Compression ${{ github.ref_name }}
             Copyright Volvi 2026
 
-            Linux x64   - empy-linux-x64
-            macOS arm64 - empy-macos-arm64
-            Windows x64 - empy-windows-x64.exe
+            | Platform      | File |
+            |---------------|------|
+            | macOS arm64   | `empy-macos-arm64.zip` |
+            | Linux x64     | `empy-linux-x64.zip` |
+            | Windows x64   | `empy-windows-x64.exe` |
 
-            macOS and Linux: chmod +x the binary before running.
+            ---
+
+            ### macOS setup (one time)
+
+            Download `empy-macos-arm64.zip`, unzip it, then run:
+
+            ```bash
+            bash install.sh
+            ```
+
+            This marks the binary executable and removes the Gatekeeper quarantine
+            flag that macOS applies to all downloaded files.
+
+            To install system-wide:
+            ```bash
+            sudo mv empy-macos-arm64 /usr/local/bin/empy
+            empy
+            ```
+
+            ### Linux setup
+
+            ```bash
+            unzip empy-linux-x64.zip
+            ./empy-linux-x64
+            ```
+
+            ### Verify download integrity
+
+            ```bash
+            sha256sum -c SHA256SUMS.txt
+            ```
           files: |
-            dist/empy-linux-x64
-            dist/empy-macos-arm64
+            dist/empy-linux-x64.zip
+            dist/empy-macos-arm64.zip
             dist/empy-windows-x64.exe
             dist/SHA256SUMS.txt
