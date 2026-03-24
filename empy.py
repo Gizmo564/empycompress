@@ -1341,12 +1341,23 @@ def cmd_gui(args):
 
             raise ValueError(f"Unknown action: {action!r}")
 
-    url = f"http://127.0.0.1:{port}"
-    try:
-        server = HTTPServer(("127.0.0.1", port), _Handler)
-    except OSError:
+    # Find a free port, starting from the requested one
+    start_port = port
+    for _candidate in range(start_port, start_port + 16):
+        try:
+            server = HTTPServer(("127.0.0.1", _candidate), _Handler)
+            port = _candidate
+            break
+        except OSError:
+            continue
+    else:
         raise ValueError(
-            f"Port {port} is already in use. Try: python empy.py gui --port <other_port>")
+            f"Ports {start_port}–{start_port + 15} are all in use. "
+            f"Try: empy gui --port <other_port>")
+
+    url = f"http://127.0.0.1:{port}"
+    if port != start_port:
+        print(f"  ⚠   Port {start_port} was busy — using {port} instead.")
 
     print(f"  🌐  GUI running at {url}")
     print(f"  ℹ   Opening browser automatically ...")
