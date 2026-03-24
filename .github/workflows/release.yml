@@ -47,16 +47,27 @@ jobs:
       - name: Build macOS icon
         if: runner.os == 'macOS'
         run: |
-          mkdir -p icon.iconset
-          sips -z 16 16   assets/icon.png --out icon.iconset/icon_16x16.png
-          sips -z 32 32   assets/icon.png --out icon.iconset/icon_16x16@2x.png
-          sips -z 32 32   assets/icon.png --out icon.iconset/icon_32x32.png
-          sips -z 64 64   assets/icon.png --out icon.iconset/icon_32x32@2x.png
-          sips -z 128 128 assets/icon.png --out icon.iconset/icon_128x128.png
-          sips -z 256 256 assets/icon.png --out icon.iconset/icon_128x128@2x.png
-          sips -z 256 256 assets/icon.png --out icon.iconset/icon_256x256.png
-          sips -z 512 512 assets/icon.png --out icon.iconset/icon_256x256@2x.png
-          sips -z 512 512 assets/icon.png --out icon.iconset/icon_512x512.png
+          pip install pillow -q
+          python3 -c "
+          from PIL import Image
+          import os
+          os.makedirs('icon.iconset', exist_ok=True)
+          src = Image.open('assets/icon.png').convert('RGBA')
+          sizes = [
+              ('icon_16x16.png',      16),
+              ('icon_16x16@2x.png',   32),
+              ('icon_32x32.png',      32),
+              ('icon_32x32@2x.png',   64),
+              ('icon_128x128.png',   128),
+              ('icon_128x128@2x.png',256),
+              ('icon_256x256.png',   256),
+              ('icon_256x256@2x.png',512),
+              ('icon_512x512.png',   512),
+          ]
+          for name, size in sizes:
+              src.resize((size, size), Image.LANCZOS).save(f'icon.iconset/{name}', format='PNG')
+          print('Iconset written')
+          "
           iconutil -c icns icon.iconset -o assets/icon.icns
 
       - name: Build Linux icon
